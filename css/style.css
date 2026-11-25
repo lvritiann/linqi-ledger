@@ -114,4 +114,16 @@ table.ledger tr:hover td{background:#f9fbfe}
 .lightbox{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:200;cursor:zoom-out}
 .lightbox img{max-width:92vw;max-height:92vh;object-fit:contain}
 @media(max-width:900px){.g3,.g2{grid-template-columns:1fr}main{padding:14px}.brand-sub{display:none}.tab{padding:11px 10px;font-size:13px}}
-@media print{.topbar,.tabs,.toolbar,.stepbar,.form-footer,.toast{display:none!important}main{padding:0}.card{box-shadow:none;break-inside:avoid}}
+/* ---- 公司导出端 ---- */
+.admin-gate{max-width:520px;margin:60px auto;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:28px;box-shadow:var(--shadow)}
+.admin-gate h2{margin:0 0 8px;font-size:18px}
+.admin-gate p{color:var(--muted);font-size:13px;margin:0 0 16px}
+.summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.summary-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;box-shadow:var(--shadow)}
+.summary-card span{display:block;font-size:12px;color:var(--muted)}
+.summary-card b{display:block;font-size:22px;margin-top:4px}
+.admin-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.table-wrap{overflow:auto;border:1px solid var(--border);border-radius:8px}
+.print-head{display:none}
+@media(max-width:900px){.summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media print{.topbar,.tabs,.toolbar,.stepbar,.form-footer,.toast,.admin-actions,.field-inline{display:none!important}main{padding:0;max-width:none}.card{box-shadow:none;break-inside:avoid;border:0;padding:8px 0}.table-wrap{border:0}.print-head{display:block;margin-bottom:10px;font-size:14px}.summary-grid{grid-template-columns:repeat(4,minmax(0,1fr))}table.ledger th,table.ledger td{padding:5px 6px;font-size:11px}}

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>临期商品一单一销台账 · 公司导出端</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark">LQ</span>
+    <div>
+      <h1>临期商品一单一销台账 · 公司导出端</h1>
+      <p class="brand-sub">读取金山在线表格 · 统一导出 · 全过程留痕打印</p>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <button type="button" class="btn btn-ghost" id="btnAdminOpenKdocs">打开在线台账</button>
+  </div>
+</header>
+
+<div class="admin-gate" id="adminGate">
+  <h2>公司端入口</h2>
+  <p>本页仅供公司导出、打印使用，不向油站开放。输入公司端口令后读取在线数据。</p>
+  <label class="field"><span>公司端口令</span><input type="password" id="adminCode" placeholder="默认 888888，可在 js/config.js 修改"></label>
+  <div class="btn-row" style="margin-top:14px"><button type="button" class="btn btn-primary" id="btnAdminLogin">进入公司端</button></div>
+</div>
+
+<main id="adminMain" style="display:none">
+  <div class="print-head" id="printHead"></div>
+
+  <div class="summary-grid">
+    <div class="summary-card"><span>在线单据</span><b id="sumRecords">0</b></div>
+    <div class="summary-card"><span>提交日志</span><b id="sumLogs">0</b></div>
+    <div class="summary-card"><span>图片张数</span><b id="sumImages">0</b></div>
+    <div class="summary-card"><span>最近提交</span><b id="sumLatest" style="font-size:15px">—</b></div>
+  </div>
+
+  <div class="admin-actions">
+    <button type="button" class="btn btn-ghost" id="btnAdminRefresh">刷新在线数据</button>
+    <button type="button" class="btn btn-primary" id="btnAdminExport">导出 Excel（公司打印版）</button>
+    <button type="button" class="btn btn-success" id="btnAdminPrint">直接打印 / 另存 PDF</button>
+  </div>
+
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <label class="field-inline"><span>油站</span><input type="text" id="adminFilterStation" placeholder="全部" style="width:140px"></label>
+      <label class="field-inline"><span>月份</span><input type="month" id="adminFilterMonth" style="width:150px"></label>
+    </div>
+    <div class="toolbar-right" id="adminState">尚未读取</div>
+  </div>
+
+  <div class="card">
+    <h2>一单一销台账（在线）</h2>
+    <div class="table-wrap">
+      <table class="ledger" id="adminRecordTable">
+        <thead><tr>
+          <th>单号</th><th>油站</th><th>月份</th><th>填报人</th><th>状态</th><th>分类汇总</th>
+          <th>临期金额</th><th>占比</th><th>1%红线</th><th>OA单号</th><th>图片清单</th>
+        </tr></thead>
+        <tbody id="adminRecordBody"></tbody>
+      </table>
+      <div id="adminRecordEmpty" class="empty">暂无在线记录，或云函数尚未配置。</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>提交日志（全过程留痕）</h2>
+    <div class="table-wrap">
+      <table class="ledger" id="adminLogTable">
+        <thead><tr>
+          <th>序号</th><th>单号</th><th>油站</th><th>月份</th><th>提交时间</th><th>提交人</th>
+          <th>品类数</th><th>临期金额</th><th>图片数</th><th>操作类型</th><th>备注</th>
+        </tr></thead>
+        <tbody id="adminLogBody"></tbody>
+      </table>
+      <div id="adminLogEmpty" class="empty">暂无提交日志。</div>
+    </div>
+  </div>
+</main>
+
+<div id="toast" class="toast"></div>
+<script>
+window.addEventListener('error', function(e){
+  var box=document.getElementById('toast');
+  if(box){box.className='toast show err';box.textContent='脚本错误：'+(e.message||'未知');}
+});
+</script>
+<script src="vendor/exceljs.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/cloud.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>

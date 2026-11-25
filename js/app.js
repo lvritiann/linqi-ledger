@@ -1,24 +1,26 @@
-/* 主控制器 */
+/* 油站填报端主控制器 · 云端直写版
+ * 原则：网页不存数据。所有提交经云函数写入金山在线表格；刷新页面即清空重填。 */
 (function (global) {
   'use strict';
   const U = global.LQUtils;
-  const DB = global.LQDB;
+  const Cloud = global.LQCloud;
   const $ = U.$, $$ = U.$$;
 
   const STATE = {
-    current: null,          // 当前单据对象
-    images: {},             // 当前编辑中的图片分组
-    cats: [],               // 当前分类汇总 [{name,qty,amount}]
+    current: null,
+    images: {},
+    cats: [],
     allIds: [],
+    records: [],
+    logs: [],
     activeGroup: 'detailImages',
     step: 0,
     dirty: false
   };
   const GROUP_KEYS = ['detailImages', 'applyImages', 'approveImages', 'repriceImages', 'saleImages', 'closeImages', 'auditImages'];
 
-  // 简写别名（供 App 内部方法调用，避免遗漏 App. 前缀）
   function newOrder() { return App.newOrder(); }
-  function loadOrder(id) { return App.loadOrder(id); }
+  function loadPlaceholder(id) { return App.loadPlaceholder(id); }
 
   const App = {
     getImages(g) { return STATE.images[g] || (STATE.images[g] = []); },
@@ -37,14 +39,24 @@
     },
 
     async init() {
-      const all = await DB.all();
-      STATE.allIds = all.map(o => o.id);
       bindUI();
       bindCats();
       global.LQImages.init();
-      if (all.length) await loadOrder(all[0].id); else await newOrder();
-      await refreshLedger();
-      updateExportMeta();
+
+      /* 只从云端读单号用于避免重号；读不到也不影响填报 */
+      try {
+        const data = await Cloud.list();
+        if (data && data.ok !== false) {
+          STATE.records = data.records || [];
+          STATE.logs = data.logs || [];
+          STATE.allIds = STATE.records.map(o => o.id);
+        }
+      } catch (e) {
+        /* 云函数未配置时静默：页面仍可填，提交时会给出明确提示 */
+      }
+
+      await App.newOrder();
+      renderRecords();
     },
 
     blankOrder() {
@@ -59,7 +71,7 @@
         soldQty: '', soldAmount: '', saleEndDate: '',
         closeDate: '', closeNote: '', auditIssueNo: '', auditResolved: '未解决', auditRisk: '', auditFixed: '',
         detailImages: [], applyImages: [], approveImages: [], repriceImages: [], saleImages: [], closeImages: [], auditImages: [],
-        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+        createdAt: new Date().toISOString()
       };
     },
 
@@ -73,28 +85,16 @@
       fillForm(STATE.current);
       $('#orderId').value = STATE.current.id;
       setStep(0);
-      setSaveState('新单据（未保存）', false);
-      updateExportMeta();
+      setSaveState('新单据（未提交）', false);
+      STATE.dirty = false;
     },
 
-    async loadOrder(id) {
-      const o = await DB.get(id);
-      if (!o) { U.toast('单据不存在', true); return; }
-      STATE.current = o;
-      STATE.images = {};
-      GROUP_KEYS.forEach(g => {
-        STATE.images[g] = Array.isArray(o[g]) ? o[g].map(x => Object.assign({}, x)) : [];
-        App.renderImages(g);
-      });
-      STATE.cats = Array.isArray(o.categories) && o.categories.length
-        ? o.categories.map(x => Object.assign({}, x)) : [{ name: '', qty: '', amount: '' }];
-      renderCats();
-      fillForm(o);
-      $('#orderId').value = o.id;
-      setStep(0);
-      setSaveState('已加载', true);
+    /* 提交记录页只读，不加载回表单；如需更正用同单号重新提交 */
+    async loadPlaceholder(id) {
+      U.toast('在线记录只读；如需更正，请用同一单号重新提交');
+      $('#orderId').value = id;
+      markDirty();
       switchTab('form');
-      updateExportMeta();
     },
 
     collect() {
@@ -104,14 +104,15 @@
         if (!el.name) return;
         o[el.name] = el.value;
       });
-      o.categories = STATE.cats.map(c => ({ name: String(c.name || ''), qty: String(c.qty || ''), amount: String(c.amount || '') }));
+      o.categories = STATE.cats.map(c => ({
+        name: String(c.name || ''), qty: String(c.qty || ''), amount: String(c.amount || '')
+      }));
       const sub = U.calcCategories(o.categories);
       o.categoryCount = sub.rows;
       o.batchTotal = o.batchTotal || String(sub.qty);
       o.nearExpireAmount = String(sub.amount);
       o.id = $('#orderId').value.trim() || o.id;
-      // 若保存前才填了油站，自动把单号里的"未填"换成站名
-      if (o.station && o.id.includes('未填') && !STATE.allIds.includes(U.makeId(o.station, o.month, STATE.allIds.filter(x => x !== STATE.current.id)))) {
+      if (o.station && o.id.includes('未填')) {
         o.id = U.makeId(o.station, o.month, STATE.allIds.filter(x => x !== STATE.current.id));
         $('#orderId').value = o.id;
       }
@@ -120,34 +121,53 @@
       return o;
     },
 
-    async save(silent) {
-      const o = App.collect();
-      if (!o.id) { U.toast('请填写单号', true); return; }
-      if (!o.station) { U.toast('请填写油站', true); return; }
-      if (!o.month) { U.toast('请选择统计月份', true); return; }
-      if (!o.categories.some(c => String(c.name || '').trim())) { U.toast('请至少填写一个品类', true); return; }
-      const isNew = !STATE.allIds.includes(o.id);
-      await DB.put(o);
-      if (isNew) STATE.allIds.push(o.id);
-      STATE.current = o;
-      STATE.dirty = false;
-      setSaveState('已保存 ' + new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }), true);
-      await refreshLedger();
-      updateExportMeta();
-      if (!silent) U.toast('单据已保存');
+    validate(o) {
+      if (!o.id) return '请填写单号';
+      if (!o.station) return '请填写油站';
+      if (!o.month) return '请选择统计月份';
+      if (!o.categories.some(c => String(c.name || '').trim())) return '请至少填写一个品类';
+      return '';
     },
 
-    async removeOrder(id) {
-      if (!confirm(`确定删除单据 ${id}？此操作不可撤销。`)) return;
-      await DB.remove(id);
-      STATE.allIds = STATE.allIds.filter(x => x !== id);
-      if (STATE.current && STATE.current.id === id) {
-        const all = await DB.all();
-        if (all.length) await loadOrder(all[0].id); else await newOrder();
+    async submit(actionType) {
+      const o = App.collect();
+      const err = App.validate(o);
+      if (err) { U.toast(err, true); return; }
+
+      const btnSubmit = $('#btnSubmit');
+      const btnClose = $('#btnCloseOrder');
+      btnSubmit.disabled = true;
+      btnClose.disabled = true;
+      setSaveState('正在提交到在线台账…', false);
+
+      o.submittedAt = formatNow();
+      if (actionType === '销单') {
+        o.status = '已销单';
+        if (!o.closeDate) o.closeDate = U.today();
       }
-      await refreshLedger();
-      updateExportMeta();
-      U.toast('已删除');
+
+      try {
+        const ret = await Cloud.submit(o, actionType || '提交');
+        if (ret && ret.ok === true) {
+          STATE.current = o;
+          STATE.dirty = false;
+          if (STATE.allIds.indexOf(o.id) < 0) STATE.allIds.push(o.id);
+          setSaveState('已提交 ' + formatHM(), true);
+          U.toast('已提交并写入在线台账：' + o.id);
+          await refreshRecords(true);
+        } else if (ret && ret.pending === true) {
+          setSaveState('已送达，结果未确认', false);
+          U.toast('已送达金山，但结果未确认。请先到在线台账核对，不要重复提交。', true);
+        } else {
+          throw new Error((ret && ret.error) || '落表失败（无具体错误）');
+        }
+      } catch (e) {
+        setSaveState('提交失败', false);
+        U.toast('提交失败：' + (e && e.message ? e.message : e), true);
+      } finally {
+        btnSubmit.disabled = false;
+        btnClose.disabled = false;
+      }
     },
 
     async closeOrder() {
@@ -158,41 +178,21 @@
         U.toast('销单前请先处理：' + bad[0].text, true);
         return;
       }
-      o.status = '已销单';
-      if (!o.closeDate) o.closeDate = U.today();
-      STATE.current = o;
-      $('[name="status"]').value = '已销单';
-      $('[name="closeDate"]').value = o.closeDate;
-      await App.save(true);
-      U.toast('已确认销单：' + o.id);
-    },
-
-    async backup() {
-      const all = await DB.all();
-      const blob = new Blob([JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), orders: all }, null, 2)],
-        { type: 'application/json' });
-      U.download(blob, `临期台账备份_${U.today()}.json`);
-      U.toast(`已备份 ${all.length} 张单据`);
-    },
-
-    async restore(file) {
-      if (!file) return;
-      try {
-        const text = await file.text();
-        const data = JSON.parse(text);
-        const orders = Array.isArray(data) ? data : data.orders;
-        if (!Array.isArray(orders)) throw new Error('备份格式不正确');
-        if (!confirm(`将恢复 ${orders.length} 张单据。与现有单据同号的会被覆盖，是否继续？`)) return;
-        for (const o of orders) await DB.put(o);
-        STATE.allIds = (await DB.all()).map(o => o.id);
-        await refreshLedger();
-        if (orders.length) await loadOrder(orders[orders.length - 1].id);
-        U.toast(`已恢复 ${orders.length} 张单据`);
-      } catch (e) { U.toast('恢复失败：' + e.message, true); }
+      await App.submit('销单');
     }
   };
 
   /* ---------- 视图辅助 ---------- */
+  function formatNow() {
+    const d = new Date();
+    const p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  }
+  function formatHM() {
+    const d = new Date();
+    return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  }
+
   function fillForm(o) {
     $$('#orderForm [name]').forEach(el => {
       if (el.name in o) el.value = o[el.name] == null ? '' : o[el.name];
@@ -229,8 +229,7 @@
       if (!STATE.cats[i]) return;
       STATE.cats[i][el.dataset.cf] = el.value;
       STATE.dirty = true; markDirty();
-      updateCatTotal();
-      recalc();
+      updateCatTotal(); recalc();
     });
     body.addEventListener('click', e => {
       const btn = e.target.closest('.cat-del');
@@ -251,10 +250,11 @@
     });
   }
 
-  function markDirty() { setSaveState('有未保存修改', false); }
+  function markDirty() { setSaveState('有未提交修改', false); }
 
   function setSaveState(text, saved) {
     const el = $('#saveState');
+    if (!el) return;
     el.textContent = text;
     el.className = 'save-state' + (saved ? ' saved' : '');
   }
@@ -275,8 +275,7 @@
   function switchTab(tab) {
     $$('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
     $$('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab));
-    if (tab === 'ledger') refreshLedger();
-    if (tab === 'export') updateExportMeta();
+    if (tab === 'records') refreshRecords();
   }
 
   function recalc() {
@@ -318,49 +317,66 @@
       `<li class="${i.ok ? 'ok' : 'bad'}">${i.ok ? '✓' : '✗'} ${U.escapeHtml(i.text)}</li>`).join('');
   }
 
-  let ledgerCache = [];
-  async function refreshLedger() {
-    ledgerCache = await DB.all();
-    $('#ledgerCount').textContent = ledgerCache.length;
-    const st = $('#filterStation').value.trim();
-    const mo = $('#filterMonth').value;
-    const status = $('#filterStatus').value;
-    const rows = ledgerCache.filter(o =>
-      (!st || String(o.station || '').includes(st)) &&
-      (!mo || o.month === mo) &&
-      (!status || o.status === status)
-    );
-    const body = $('#ledgerBody');
-    body.innerHTML = rows.map(o => {
-      const near = o.nearExpireAmount || String(U.calcCategories(o.categories).amount);
-      const r = U.calcRatios({ monthSales: { value: o.monthSales }, expiredAmount: { value: o.expiredAmount } }, parseFloat(near) || 0);
-      const imgCount = GROUP_KEYS.reduce((n, g) => n + ((o[g] || []).length), 0);
-      const catCount = (o.categories || []).filter(c => String(c.name || '').trim()).length;
-      const tagCls = o.status === '已销单' ? 'done' : (r.over ? 'warn' : '');
-      const catNames = (o.categories || []).filter(c => String(c.name || '').trim()).map(c => c.name).join('、').slice(0, 18);
-      return `<tr>
-        <td class="mono">${U.escapeHtml(o.id)}</td>
-        <td>${U.escapeHtml(o.station)}</td>
-        <td>${U.escapeHtml(o.month)}</td>
-        <td>${U.escapeHtml(catNames || '—')}<br><small style="color:#9aa1ad">${catCount} 类</small></td>
-        <td>${U.escapeHtml(o.applyType || '')}</td>
-        <td style="color:${r.over ? '#c83a3a' : 'inherit'}">${U.pct(r.ratio)}</td>
-        <td><span class="tag ${tagCls}">${U.escapeHtml(o.status || '')}</span></td>
-        <td>${imgCount} 张</td>
-        <td>
-          <button class="link-btn" data-act="edit" data-id="${U.escapeHtml(o.id)}">编辑</button>
-          <button class="link-btn" data-act="del" data-id="${U.escapeHtml(o.id)}">删除</button>
-        </td>
-      </tr>`;
-    }).join('');
-    $('#ledgerEmpty').style.display = rows.length ? 'none' : '';
+  /* ---------- 在线提交记录（只读） ---------- */
+  async function refreshRecords(silent) {
+    try {
+      const data = await Cloud.list();
+      if (data && data.ok === false) throw new Error(data.error || '查询失败');
+      STATE.records = (data && data.records) || [];
+      STATE.logs = (data && data.logs) || [];
+      STATE.allIds = STATE.records.map(o => o.id);
+    } catch (e) {
+      if (!silent) U.toast('读取在线记录失败：' + (e && e.message ? e.message : e), true);
+    }
+    renderRecords();
   }
 
-  async function updateExportMeta() {
-    const all = await DB.all();
-    $('#excelMeta').textContent = `当前共 ${all.length} 张单据（含全部佐证图片）`;
-    const cur = STATE.current ? STATE.current.id : '未选择';
-    $('#wordMeta').textContent = `当前单据：${cur}`;
+  function renderRecords() {
+    const st = ($('#filterRecordStation') && $('#filterRecordStation').value.trim()) || '';
+    const mo = ($('#filterRecordMonth') && $('#filterRecordMonth').value) || '';
+    const rows = STATE.records.filter(o =>
+      (!st || String(o.station || '').includes(st)) && (!mo || o.month === mo)
+    );
+    const body = $('#recordBody');
+    if (body) {
+      body.innerHTML = rows.map(o => {
+        const imgs = o.imageList ? o.imageList.split('|').length : 0;
+        const over = String(o.redline || '').indexOf('超') >= 0;
+        const cat = String(o.categoryText || '').slice(0, 18);
+        return `<tr>
+          <td class="mono">${U.escapeHtml(o.id)}</td>
+          <td>${U.escapeHtml(o.station)}</td>
+          <td>${U.escapeHtml(o.month)}</td>
+          <td>${U.escapeHtml(cat || '—')}<br><small style="color:#9aa1ad">${o.categoryCount || 0} 类</small></td>
+          <td>${U.money(o.nearAmount)}</td>
+          <td style="color:${over ? '#c83a3a' : 'inherit'}">${U.escapeHtml(o.ratioText || '0.00%')}</td>
+          <td><span class="tag ${o.status === '已销单' ? 'done' : ''}">${U.escapeHtml(o.status || '')}</span></td>
+          <td>${imgs} 张</td>
+        </tr>`;
+      }).join('');
+    }
+    if ($('#recordCount')) $('#recordCount').textContent = STATE.records.length;
+    if ($('#recordEmpty')) $('#recordEmpty').style.display = rows.length ? 'none' : '';
+
+    const logRows = STATE.logs.filter(o =>
+      (!st || String(o.station || '').includes(st)) && (!mo || o.month === mo)
+    );
+    const logBody = $('#logBody');
+    if (logBody) {
+      logBody.innerHTML = logRows.map(o => `<tr>
+        <td>${o.seq || ''}</td>
+        <td class="mono">${U.escapeHtml(o.id)}</td>
+        <td>${U.escapeHtml(o.station)}</td>
+        <td>${U.escapeHtml(o.submittedAt)}</td>
+        <td>${U.escapeHtml(o.handler)}</td>
+        <td>${o.categoryCount || 0}</td>
+        <td>${U.money(o.nearAmount)}</td>
+        <td>${o.imageCount || 0}</td>
+        <td>${U.escapeHtml(o.actionType || '提交')}</td>
+      </tr>`).join('');
+    }
+    if ($('#logCount')) $('#logCount').textContent = STATE.logs.length;
+    if ($('#logEmpty')) $('#logEmpty').style.display = logRows.length ? 'none' : '';
   }
 
   /* ---------- 事件绑定 ---------- */
@@ -370,78 +386,34 @@
     $('#btnPrevStep').addEventListener('click', () => setStep(STATE.step - 1));
     $('#btnNextStep').addEventListener('click', () => { App.collect(); setStep(STATE.step + 1); });
 
-    $('#orderForm').addEventListener('input', () => {
-      STATE.dirty = true; markDirty();
-      const g = STATE.activeGroup;
-      // activeGroup 由 upload-block 点击更新
-      recalc();
-    });
+    $('#orderForm').addEventListener('input', () => { STATE.dirty = true; markDirty(); recalc(); });
     $('#orderForm').addEventListener('change', () => { STATE.dirty = true; markDirty(); recalc(); });
     $$('.upload-block').forEach(b => b.addEventListener('click', () => { STATE.activeGroup = b.dataset.group; }));
 
-    $('#btnSave').addEventListener('click', () => App.save());
+    $('#btnSubmit').addEventListener('click', () => App.submit('提交'));
+    $('#btnCloseOrder').addEventListener('click', () => App.closeOrder());
     $('#btnNew').addEventListener('click', async () => {
-      if (STATE.dirty && !confirm('当前单据有未保存修改，确定新建？')) return;
+      if (STATE.dirty && !confirm('当前单据尚未提交，确定清空重填？')) return;
       await App.newOrder();
     });
-    $('#btnCloseOrder').addEventListener('click', () => App.closeOrder());
     $('#btnNewId').addEventListener('click', () => {
       const o = App.collect();
       $('#orderId').value = U.makeId(o.station, o.month, STATE.allIds.filter(x => x !== STATE.current.id));
       markDirty();
     });
 
-    $('#filterStation').addEventListener('input', refreshLedger);
-    $('#filterMonth').addEventListener('change', refreshLedger);
-    $('#filterStatus').addEventListener('change', refreshLedger);
-
-    $('#ledgerBody').addEventListener('click', e => {
-      const b = e.target.closest('button[data-act]');
-      if (!b) return;
-      if (b.dataset.act === 'edit') App.loadOrder(b.dataset.id);
-      if (b.dataset.act === 'del') App.removeOrder(b.dataset.id);
+    $('#btnOpenKdocs').addEventListener('click', () => {
+      const url = (global.LQ_CFG && global.LQ_CFG.kdocs && global.LQ_CFG.kdocs.url) || '';
+      if (url) window.open(url, '_blank');
     });
 
-    $('#btnClearAll').addEventListener('click', async () => {
-      if (!confirm('⚠️ 将清空全部单据和图片，不可恢复！建议先备份 JSON。确定继续？')) return;
-      if (!confirm('请再次确认：真的要清空全部数据吗？')) return;
-      await DB.clear();
-      STATE.allIds = [];
-      await App.newOrder();
-      await refreshLedger();
-      updateExportMeta();
-      U.toast('已清空');
-    });
-
-    $('#btnExportExcel').addEventListener('click', async () => {
-      const all = await DB.all();
-      await global.LQExportExcel.exportExcel(all);
-    });
-    $('#btnExportWord').addEventListener('click', async () => {
-      const scope = $('input[name="wordScope"]:checked').value;
-      if (scope === 'current') {
-        await global.LQExportWord.exportWord([App.collect()], 'current');
-      } else {
-        const all = await DB.all();
-        await global.LQExportWord.exportWord(all, 'all');
-      }
-    });
-
-    $('#btnBackup').addEventListener('click', () => App.backup());
-    $('#btnBackup2').addEventListener('click', () => App.backup());
-    $('#btnRestore').addEventListener('click', () => $('#restoreFile').click());
-    $('#btnRestore2').addEventListener('click', () => $('#restoreFile').click());
-    $('#restoreFile').addEventListener('change', async e => {
-      await App.restore(e.target.files[0]);
-      e.target.value = '';
-    });
+    $('#btnRefreshRecords').addEventListener('click', () => refreshRecords());
+    $('#filterRecordStation').addEventListener('input', renderRecords);
+    $('#filterRecordMonth').addEventListener('change', renderRecords);
 
     window.addEventListener('beforeunload', e => {
       if (STATE.dirty) { e.preventDefault(); e.returnValue = ''; }
     });
-
-    // 定时自动保存（每 30 秒），防止忘记点保存
-    setInterval(() => { if (STATE.dirty && STATE.current && STATE.current.id) App.save(true); }, 30000);
   }
 
   global.LQApp = App;
