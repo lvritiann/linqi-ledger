@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>临期商品一单一销台账</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark">LQ</span>
+    <div>
+      <h1>临期商品一单一销台账</h1>
+      <p class="brand-sub">申请 · 审批 · 调价 · 销售 · 销单 —— 一单到底，佐证留痕</p>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <button type="button" class="btn btn-ghost" id="btnBackup">备份 JSON</button>
+    <button type="button" class="btn btn-ghost" id="btnRestore">恢复 JSON</button>
+    <input type="file" id="restoreFile" accept="application/json,.json" hidden>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button type="button" class="tab active" data-tab="form" role="tab">填报单据</button>
+  <button type="button" class="tab" data-tab="ledger" role="tab">台账列表 <span id="ledgerCount" class="pill">0</span></button>
+  <button type="button" class="tab" data-tab="export" role="tab">导出中心</button>
+  <button type="button" class="tab" data-tab="help" role="tab">填报说明</button>
+</nav>
+
+<main>
+<!-- ============ 填报 ============ -->
+<section id="panel-form" class="panel active">
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <label class="field-inline">
+        <span>单号</span>
+        <input type="text" id="orderId" class="mono" placeholder="自动生成，可修改" style="width:200px">
+      </label>
+      <button type="button" class="btn btn-ghost btn-sm" id="btnNewId">重新生成</button>
+    </div>
+    <div class="toolbar-right">
+      <span id="saveState" class="save-state">尚未保存</span>
+      <button type="button" class="btn btn-ghost" id="btnNew">新建</button>
+      <button type="button" class="btn btn-primary" id="btnSave">保存单据</button>
+    </div>
+  </div>
+
+  <div class="stepbar" id="stepbar">
+    <button type="button" class="step active" data-step="s1"><b>1</b> 批次与分类</button>
+    <button type="button" class="step" data-step="s2"><b>2</b> 申请与审批</button>
+    <button type="button" class="step" data-step="s3"><b>3</b> 调价与销售</button>
+    <button type="button" class="step" data-step="s4"><b>4</b> 销单与审计</button>
+  </div>
+
+  <form id="orderForm" autocomplete="off">
+  <!-- Step 1 -->
+  <div class="step-panel active" id="s1">
+    <div class="card">
+      <h2>基础信息</h2>
+      <div class="grid g3">
+        <label class="field"><span>油站 <i>*</i></span><input type="text" name="station" placeholder="如：秦岭" required></label>
+        <label class="field"><span>统计月份 <i>*</i></span><input type="month" name="month" required></label>
+        <label class="field"><span>填报人</span><input type="text" name="handler" placeholder="姓名或岗位"></label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>批次信息 <span class="req-note">一单一批，不必逐商品填</span></h2>
+      <div class="grid g3">
+        <label class="field"><span>批次号</span><input type="text" name="batchNo" placeholder="如：PC-202611-01"></label>
+        <label class="field"><span>盘点日期</span><input type="date" name="checkDate"><small>留空按今天</small></label>
+        <label class="field"><span>批次商品总数（件）</span><input type="number" name="batchTotal" min="0" step="1" placeholder="本批临期商品总件数"></label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>分类汇总 <span class="req-note">按品类填总数即可，单品明细见附表图片</span></h2>
+      <div class="cat-wrap">
+        <table class="cat-table" id="catTable">
+          <thead><tr>
+            <th style="width:46%">品类名称</th>
+            <th style="width:18%">数量（件）</th>
+            <th style="width:20%">金额（元）</th>
+            <th style="width:16%">操作</th>
+          </tr></thead>
+          <tbody id="catBody"></tbody>
+          <tfoot><tr>
+            <td>合计</td><td id="catTotalQty">0</td><td id="catTotalAmt">0.00</td><td></td>
+          </tr></tfoot>
+        </table>
+      </div>
+      <button type="button" class="btn btn-ghost btn-sm" id="btnAddCat" style="margin-top:10px">＋ 添加分类</button>
+    </div>
+
+    <div class="card">
+      <h2>附表图片：临期商品明细 <span class="req-note">单品清单拍照上传，逐项以图为准</span></h2>
+      <p class="hint-line">把系统导出的临期清单、手写明细表或价签拍照上传。表格里只填分类汇总，不再逐商品录入。</p>
+      <div class="upload-block" data-group="detailImages" data-title="临期商品明细附表（可多张）"></div>
+    </div>
+  </div>
+
+  <!-- Step 2 -->
+  <div class="step-panel" id="s2">
+    <div class="card">
+      <h2>销售与临期比例</h2>
+      <div class="grid g3">
+        <label class="field"><span>当月非油销售额（元）<i>*</i></span><input type="number" name="monthSales" min="0" step="0.01"></label>
+        <label class="field"><span>是否有过期产品</span><select name="hasExpired"><option value="否">否</option><option value="是">是</option></select></label>
+        <label class="field"><span>过期商品金额（元）</span><input type="number" name="expiredAmount" min="0" step="0.01"></label>
+      </div>
+      <div class="calc-strip" id="ratioStrip">
+        <div><span>临期商品金额（分类合计）</span><b id="calcNearAmt">0.00</b></div>
+        <div><span>临期+过期占销售额</span><b id="calcRatio">0.00%</b></div>
+        <div><span>1% 红线（第二十六条）</span><b id="calcRedline">未触发</b></div>
+      </div>
+      <label class="field full"><span>分类说明（可选）</span><textarea name="nearExpireProducts" rows="2" placeholder="如：食品类集中在饮料、零食；非食品以汽车用品为主。明细详见附表图片"></textarea></label>
+    </div>
+
+    <div class="card">
+      <h2>申请信息 <span class="req-note">对应第十七条：2个工作日内联系供应商或提出申请</span></h2>
+      <div class="grid g2">
+        <label class="field"><span>申请日期</span><input type="date" name="applyDate"></label>
+        <label class="field"><span>处理方式</span><select name="applyType">
+          <option value="退换供应商">退换供应商</option>
+          <option value="降价促销">降价促销</option>
+          <option value="买赠促销">买赠促销</option>
+          <option value="站间调拨">站间调拨</option>
+          <option value="报损">报损</option>
+          <option value="第三方收购">第三方收购</option>
+        </select></label>
+      </div>
+      <label class="field full"><span>申请事由</span><textarea name="applyReason" rows="2" placeholder="说明临期原因、拟处理方式、预计损失"></textarea></label>
+      <div class="upload-block" data-group="applyImages" data-title="申请截图（报损单/申请单/台账照片）"></div>
+    </div>
+
+    <div class="card">
+      <h2>审批信息 <span class="req-note">对应第十七条：报计划经营科审批后执行</span></h2>
+      <div class="grid g3">
+        <label class="field"><span>OA 单号</span><input type="text" name="oaNo" placeholder="OA 审批流水号"></label>
+        <label class="field"><span>审批人 / 科室</span><input type="text" name="approver" placeholder="如：计划经营科"></label>
+        <label class="field"><span>审批日期</span><input type="date" name="approveDate"></label>
+        <label class="field"><span>审批结果</span><select name="approveResult">
+          <option value="待审批">待审批</option>
+          <option value="同意">同意</option>
+          <option value="有条件同意">有条件同意</option>
+          <option value="不同意">不同意</option>
+        </select></label>
+      </div>
+      <div class="upload-block" data-group="approveImages" data-title="OA 审批截图（必备佐证）"></div>
+    </div>
+  </div>
+
+  <!-- Step 3 -->
+  <div class="step-panel" id="s3">
+    <div class="card">
+      <h2>调价与让利 <span class="req-note">批次整体口径，不需逐商品填</span></h2>
+      <div class="grid g3">
+        <label class="field"><span>让利幅度（%）</span><input type="number" name="discountRate" min="0" max="100" step="0.01" placeholder="如 30 表示打七折"><small>整体折扣比例</small></label>
+        <label class="field"><span>调价日期</span><input type="date" name="repriceDate"></label>
+        <label class="field"><span>对毛利的损伤（元）</span><input type="number" name="grossDamage" min="0" step="0.01" placeholder="预计/实际毛利损失"><small>可填估算值</small></label>
+      </div>
+      <div class="calc-strip">
+        <div><span>本批临期金额</span><b id="calcNearAmt2">0.00</b></div>
+        <div><span>按让利幅度估算损失</span><b id="calcDamage">0.00</b></div>
+      </div>
+      <div class="upload-block" data-group="repriceImages" data-title="调价截图（价签/POS 调价单/系统截图）"></div>
+    </div>
+
+    <div class="card">
+      <h2>销售情况</h2>
+      <div class="grid g3">
+        <label class="field"><span>促销销售数量</span><input type="number" name="soldQty" min="0" step="0.01"></label>
+        <label class="field"><span>促销销售金额（元）</span><input type="number" name="soldAmount" min="0" step="0.01"></label>
+        <label class="field"><span>销售截止日期</span><input type="date" name="saleEndDate"></label>
+      </div>
+      <div class="upload-block" data-group="saleImages" data-title="销售情况截图（POS 流水/销售报表）"></div>
+    </div>
+  </div>
+
+  <!-- Step 4 -->
+  <div class="step-panel" id="s4">
+    <div class="card">
+      <h2>销单</h2>
+      <div class="grid g2">
+        <label class="field"><span>销单日期</span><input type="date" name="closeDate"></label>
+        <label class="field"><span>单据状态</span><select name="status">
+          <option value="草稿">草稿</option>
+          <option value="待审批">待审批</option>
+          <option value="已审批">已审批</option>
+          <option value="处理中">处理中</option>
+          <option value="已销单">已销单</option>
+        </select></label>
+      </div>
+      <label class="field full"><span>销单说明</span><textarea name="closeNote" rows="2" placeholder="处理结果、剩余库存去向、责任人"></textarea></label>
+      <div class="upload-block" data-group="closeImages" data-title="销单截图（处置完成/出入库台账）"></div>
+    </div>
+
+    <div class="card">
+      <h2>审计问题整改</h2>
+      <div class="grid g2">
+        <label class="field"><span>审计问题编号</span><input type="text" name="auditIssueNo" placeholder="如：审计-2026-05"></label>
+        <label class="field"><span>整改状态</span><select name="auditResolved">
+          <option value="未解决">未解决</option>
+          <option value="已解决">已解决</option>
+        </select></label>
+      </div>
+      <label class="field full"><span>相关风险</span><textarea name="auditRisk" rows="2" placeholder="审计指出的风险点"></textarea></label>
+      <label class="field full"><span>已解决事项</span><textarea name="auditFixed" rows="2" placeholder="已采取的整改与留痕"></textarea></label>
+      <div class="upload-block" data-group="auditImages" data-title="审计佐证截图"></div>
+    </div>
+
+    <div class="card close-check" id="closeCheck">
+      <h2>销单前自检</h2>
+      <ul id="checkList"></ul>
+    </div>
+  </div>
+  </form>
+
+  <div class="form-footer">
+    <button type="button" class="btn btn-ghost" id="btnPrevStep">上一步</button>
+    <button type="button" class="btn btn-primary" id="btnNextStep">下一步</button>
+    <button type="button" class="btn btn-success" id="btnCloseOrder">确认销单</button>
+  </div>
+</section>
+
+<!-- ============ 台账 ============ -->
+<section id="panel-ledger" class="panel">
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <label class="field-inline"><span>筛选油站</span><input type="text" id="filterStation" placeholder="全部" style="width:130px"></label>
+      <label class="field-inline"><span>月份</span><input type="month" id="filterMonth" style="width:150px"></label>
+      <label class="field-inline"><span>状态</span><select id="filterStatus" style="width:120px"><option value="">全部</option><option>草稿</option><option>待审批</option><option>已审批</option><option>处理中</option><option>已销单</option></select></label>
+    </div>
+    <div class="toolbar-right"><button type="button" class="btn btn-danger-ghost" id="btnClearAll">清空全部数据</button></div>
+  </div>
+  <div class="table-wrap">
+    <table class="ledger" id="ledgerTable">
+      <thead><tr>
+        <th>单号</th><th>油站</th><th>月份</th><th>商品</th><th>处理方式</th><th>临期比例</th><th>状态</th><th>图片</th><th>操作</th>
+      </tr></thead>
+      <tbody id="ledgerBody"></tbody>
+    </table>
+    <div id="ledgerEmpty" class="empty">暂无单据，请先到「填报单据」新建。</div>
+  </div>
+</section>
+
+<!-- ============ 导出 ============ -->
+<section id="panel-export" class="panel">
+  <div class="card export-card">
+    <h2>导出 Excel 主台账</h2>
+    <p>一张表，一行一单。申请 / 审批 / 调价 / 销售 / 销单 / 审计六组截图<strong>直接嵌在对应单元格里</strong>，双击即可查看原图。</p>
+    <div class="export-meta" id="excelMeta">当前共 0 张单据</div>
+    <button type="button" class="btn btn-primary" id="btnExportExcel">导出 Excel（.xlsx）</button>
+  </div>
+  <div class="card export-card">
+    <h2>导出 Word 存档</h2>
+    <p>每单一页，按「基础 → 申请 → 审批 → 调价 → 销售 → 销单 → 审计」排版，图片随段落插入，可直接打印签字归档。</p>
+    <div class="radio-row">
+      <label><input type="radio" name="wordScope" value="current" checked> 当前单据（一页）</label>
+      <label><input type="radio" name="wordScope" value="all"> 全部单据（每单一页合并一份）</label>
+    </div>
+    <div class="export-meta" id="wordMeta">当前单据：未选择</div>
+    <button type="button" class="btn btn-primary" id="btnExportWord">导出 Word（.docx）</button>
+  </div>
+  <div class="card export-card">
+    <h2>数据备份与迁移</h2>
+    <p>数据保存在<strong>本机浏览器</strong>，GitHub Pages 只托管页面、不存数据。换电脑或清理浏览器前，务必先备份 JSON。</p>
+    <div class="btn-row">
+      <button type="button" class="btn btn-ghost" id="btnBackup2">备份 JSON</button>
+      <button type="button" class="btn btn-ghost" id="btnRestore2">恢复 JSON</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 说明 ============ -->
+<section id="panel-help" class="panel">
+  <div class="card">
+    <h2>制度依据</h2>
+    <p>《加油站非油业务管理办法》（202411 版），陕高速延长发〔2024〕91 号，陕西高速延长石油有限责任公司 2024-11-20 印发。</p>
+    <ul class="help-list">
+      <li><b>第十七条（一）</b>：达到临期条件后 <b>2 个工作日</b>内联系供应商退换，退换后登记出入库台账；降价促销由加油站提出申请报计划经营科，<b>经审批后执行</b>。</li>
+      <li><b>第十七条（三）/ 第十八条（三）</b>：管理原因产生过期商品，按销售价赔偿，站长 75%、非油主管 25%。</li>
+      <li><b>第十八条（二）</b>：每月上报《商品报损申请表》（附件 2），经审批后报财务科处理。</li>
+      <li><b>第二十六条（二）</b>：未在保质期前三个月报告，导致临期、过期商品<b>超过销售额 1%</b>，或未执行先进先出，站长约谈并扣当月 50% 非油提成。</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h2>临期时间界定（制度表 1）</h2>
+    <table class="mini-table">
+      <thead><tr><th>标示的预包装食品保质期</th><th>临期界定（天）</th></tr></thead>
+      <tbody>
+        <tr><td>食品保质期为一年以上的</td><td>45～30</td></tr>
+        <tr><td>保质期为半年以上不足一年的</td><td>30～20</td></tr>
+        <tr><td>保质期 30 天以上不足半年的</td><td>20～7</td></tr>
+        <tr><td>保质期不足 30 天的</td><td>5～1</td></tr>
+      </tbody>
+    </table>
+    <p class="note">注：当地未明确食品临近保质期的，可由食品经营者自行设定或与供应商协商确定，但需考虑行政区域规定。</p>
+  </div>
+  <div class="card">
+    <h2>一单一销操作要点</h2>
+    <ol class="help-list">
+      <li><b>一单一批</b>：每处理一批临期商品建一张单，单号自动生成（LQ-年月-油站-序号），不逐商品建单。</li>
+      <li><b>只填分类</b>：在「分类汇总」按品类填名称、件数、金额；<b>单品明细直接拍照上传附表</b>，不用一行行录入，减轻油站负担。</li>
+      <li><b>七组佐证图片</b>：明细附表、申请、审批、调价、销售、销单、审计，每组可选多张。</li>
+      <li>图片上传后自动压缩（最长边 1400px），原始清晰度足够审计查看；电脑端可 Ctrl+V 直接粘贴截图。</li>
+      <li>临期金额自动取分类合计，临期比例自动对照 1% 红线，超线标红提示。</li>
+      <li>销单前自检：明细附表齐全、分类已填、审批结果非「不同意」、调价与销售截图齐全。</li>
+      <li>在「导出中心」生成 Excel 主台账和 Word 存档，提交给计划经营科。</li>
+    </ol>
+  </div>
+</section>
+</main>
+
+<div id="toast" class="toast"></div>
+<div id="fatalError" style="display:none;position:fixed;top:0;left:0;right:0;background:#c83a3a;color:#fff;padding:10px 16px;font-size:13px;z-index:999"></div>
+<script>
+window.addEventListener('error', function(e){
+  var box=document.getElementById('fatalError');
+  if(box){box.style.display='block';box.textContent='脚本错误：'+(e.message||'未知')+' @ '+(e.filename||'').split('/').pop()+':'+e.lineno;}
+});
+window.addEventListener('unhandledrejection', function(e){
+  var box=document.getElementById('fatalError');
+  if(box){box.style.display='block';box.textContent='异步错误：'+((e.reason&&e.reason.message)||e.reason||'未知');}
+});
+</script>
+
+<script src="vendor/exceljs.min.js"></script>
+<script src="vendor/docx.umd.js"></script>
+<script src="js/db.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/images.js"></script>
+<script src="js/export-excel.js"></script>
+<script src="js/export-word.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
