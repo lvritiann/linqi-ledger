@@ -113,14 +113,11 @@
     c.push(...imageParagraphs(order.repriceImages, '调价截图'));
     c.push(...imageParagraphs(order.saleImages, '销售情况截图'));
 
-    c.push(Heading('五、销单与审计整改', 2));
+    c.push(Heading('五、销单与留痕', 2));
     c.push(kvTable([
-      ['销单日期', order.closeDate], ['单据状态', order.status], ['销单说明', order.closeNote],
-      ['审计问题编号', order.auditIssueNo], ['整改状态', order.auditResolved],
-      ['相关风险', order.auditRisk], ['已解决事项', order.auditFixed]
+      ['销单日期', order.closeDate], ['单据状态', order.status], ['销单说明', order.closeNote]
     ]));
     c.push(...imageParagraphs(order.closeImages, '销单截图'));
-    c.push(...imageParagraphs(order.auditImages, '审计佐证截图'));
 
     c.push(new D.Paragraph({ spacing: { before: 240 },
       children: [new D.TextRun({ text: '填报人：____________    站长：____________    计划经营科：____________    日期：____________', size: 20 })] }));

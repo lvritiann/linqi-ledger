@@ -41,12 +41,7 @@
     { h: '销售情况截图', k: 'saleImages', img: true, w: 26 },
     { h: '销单日期', k: 'closeDate', w: 13 },
     { h: '销单说明', k: 'closeNote', w: 28 },
-    { h: '销单截图', k: 'closeImages', img: true, w: 26 },
-    { h: '审计问题编号', k: 'auditIssueNo', w: 16 },
-    { h: '整改状态', k: 'auditResolved', w: 11 },
-    { h: '相关风险', k: 'auditRisk', w: 28 },
-    { h: '已解决事项', k: 'auditFixed', w: 28 },
-    { h: '审计佐证截图', k: 'auditImages', img: true, w: 26 }
+    { h: '销单截图', k: 'closeImages', img: true, w: 26 }
   ];
 
   const IMG_W = 168, IMG_H = 84, EMU = 9525;

@@ -17,7 +17,7 @@
     step: 0,
     dirty: false
   };
-  const GROUP_KEYS = ['detailImages', 'applyImages', 'approveImages', 'repriceImages', 'saleImages', 'closeImages', 'auditImages'];
+  const GROUP_KEYS = ['detailImages', 'applyImages', 'approveImages', 'repriceImages', 'saleImages', 'closeImages'];
 
   function newOrder() { return App.newOrder(); }
   function loadPlaceholder(id) { return App.loadPlaceholder(id); }
@@ -69,8 +69,8 @@
         oaNo: '', approver: '计划经营科', approveDate: '', approveResult: '待审批',
         discountRate: '', repriceDate: U.today(), grossDamage: '',
         soldQty: '', soldAmount: '', saleEndDate: '',
-        closeDate: '', closeNote: '', auditIssueNo: '', auditResolved: '未解决', auditRisk: '', auditFixed: '',
-        detailImages: [], applyImages: [], approveImages: [], repriceImages: [], saleImages: [], closeImages: [], auditImages: [],
+        closeDate: '', closeNote: '',
+        detailImages: [], applyImages: [], approveImages: [], repriceImages: [], saleImages: [], closeImages: [],
         createdAt: new Date().toISOString()
       };
     },

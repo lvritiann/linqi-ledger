@@ -48,7 +48,7 @@
     <button type="button" class="step active" data-step="s1"><b>1</b> 批次与分类</button>
     <button type="button" class="step" data-step="s2"><b>2</b> 申请与审批</button>
     <button type="button" class="step" data-step="s3"><b>3</b> 调价与销售</button>
-    <button type="button" class="step" data-step="s4"><b>4</b> 销单与审计</button>
+    <button type="button" class="step" data-step="s4"><b>4</b> 销单与留痕</button>
   </div>
 
   <form id="orderForm" autocomplete="off">
@@ -194,20 +194,6 @@
       <div class="upload-block" data-group="closeImages" data-title="销单截图（处置完成/出入库台账）"></div>
     </div>
 
-    <div class="card">
-      <h2>审计问题整改</h2>
-      <div class="grid g2">
-        <label class="field"><span>审计问题编号</span><input type="text" name="auditIssueNo" placeholder="如：审计-2026-05"></label>
-        <label class="field"><span>整改状态</span><select name="auditResolved">
-          <option value="未解决">未解决</option>
-          <option value="已解决">已解决</option>
-        </select></label>
-      </div>
-      <label class="field full"><span>相关风险</span><textarea name="auditRisk" rows="2" placeholder="审计指出的风险点"></textarea></label>
-      <label class="field full"><span>已解决事项</span><textarea name="auditFixed" rows="2" placeholder="已采取的整改与留痕"></textarea></label>
-      <div class="upload-block" data-group="auditImages" data-title="审计佐证截图"></div>
-    </div>
-
     <div class="card close-check" id="closeCheck">
       <h2>销单前自检</h2>
       <ul id="checkList"></ul>
@@ -283,12 +269,17 @@
     <p class="note">注：当地未明确食品临近保质期的，可由食品经营者自行设定或与供应商协商确定，但需考虑行政区域规定。</p>
   </div>
   <div class="card">
+    <h2>临期窗口的变化</h2>
+    <p class="hint-line">保质期越长，进入临期状态的剩余天数窗口越宽；图中一珠代表一天，可直接数。</p>
+    <iframe class="chart-frame" src="charts/near-expiry-window.zh.html" title="临期界定区间图（制度表 1）" loading="lazy"></iframe>
+  </div>
+  <div class="card">
     <h2>填报与落表说明</h2>
     <ol class="help-list">
       <li><b>网页不存数据</b>：本页面只负责填报和提交，不保存单据、不备份 JSON。提交成功后可在「提交记录」或金山在线表格核对。</li>
       <li><b>一单一批</b>：每处理一批临期商品建一张单，单号自动生成（LQ-年月-油站-序号），不逐商品建单。</li>
       <li><b>只填分类</b>：在「分类汇总」按品类填名称、件数、金额；<b>单品明细直接拍照上传附表</b>，不用一行行录入。</li>
-      <li><b>七组佐证图片</b>：明细附表、申请、审批、调价、销售、销单、审计。每组最多 3 张落表；多余图片请先合并成长图再上传。</li>
+      <li><b>六组佐证图片</b>：明细附表、申请、审批、调价、销售、销单。每组最多 3 张落表；多余图片请先合并成长图再上传。</li>
       <li>图片上传后自动压缩（最长边 1400px），电脑端可 Ctrl+V 直接粘贴截图。</li>
       <li>临期金额自动取分类合计，临期比例自动对照 1% 红线，超线标红提示。</li>
       <li>每次提交都会在「提交日志」追加一行，记录时间、提交人、图片数和是否销单，供公司导出打印。</li>

@@ -19,8 +19,8 @@
  *
  * 做的事：
  *   1. 一单一行写入「一单一销台账」；同单号重复提交覆盖原行（不叠行）
- *   2. 七组佐证图片用 Range.InsertImage(base64) 直接嵌单元格
- *      每组最多 3 张：第 1 张落原表已有图片列，第 2/3 张落新增列 AR~BE
+ *   2. 六组佐证图片用 Range.InsertImage(base64) 直接嵌单元格
+ *      每组最多 3 张：第 1 张落原表已有图片列，第 2/3 张落新增列 AR~AY
  *   3. 每次提交都在「提交日志」追加一行，永不覆盖，形成全过程留痕
  *   4. action=list 时返回全部台账与日志，供公司端导出/打印
  *
@@ -35,18 +35,17 @@ var CFG = {
   PHOTO_PER_GROUP: 3
 };
 
-/* 七组图片：cols[0] 是模板原图列，cols[1]/[2] 是脚本自动补出的扩展列 */
+/* 六组图片：cols[0] 是模板原图列，cols[1]/[2] 是脚本自动补出的扩展列 */
 var IMG_GROUPS = [
   { key: 'detailImages',  label: '明细附表', cols: [18, 44, 45] },
   { key: 'applyImages',   label: '申请截图', cols: [22, 46, 47] },
   { key: 'approveImages', label: '审批截图', cols: [27, 48, 49] },
   { key: 'repriceImages', label: '调价截图', cols: [31, 50, 51] },
   { key: 'saleImages',    label: '销售截图', cols: [35, 52, 53] },
-  { key: 'closeImages',   label: '销单截图', cols: [38, 54, 55] },
-  { key: 'auditImages',   label: '审计截图', cols: [43, 56, 57] }
+  { key: 'closeImages',   label: '销单截图', cols: [38, 54, 55] }
 ];
 
-/* AR~BE 扩展列 + BF 图片清单的表头。首跑自动补写，不必手工改在线表。 */
+/* AR~AY 扩展列 + BF 图片清单的表头。首跑自动补写，不必手工改在线表。 */
 var EXTRA_HEADERS = {
   44: '明细附表图片2', 45: '明细附表图片3',
   46: '申请截图2',     47: '申请截图3',
@@ -54,7 +53,6 @@ var EXTRA_HEADERS = {
   50: '调价截图2',     51: '调价截图3',
   52: '销售情况截图2', 53: '销售情况截图3',
   54: '销单截图2',     55: '销单截图3',
-  56: '审计佐证截图2', 57: '审计佐证截图3',
   58: '图片清单'
 };
 
@@ -213,12 +211,14 @@ function calcRow(o) {
 
 function ensureHeaders(sh) {
   var added = 0;
-  for (var c = 44; c <= 58; c++) {
+  var keys = Object.keys(EXTRA_HEADERS);
+  for (var i = 0; i < keys.length; i++) {
+    var c = Number(keys[i]);
     try {
       var v = sh.Range(col(c) + '1').Value2;
       if (v && v.length !== undefined) v = v[0];
       if (!s(v)) {
-        sh.Range(col(c) + '1').Value2 = EXTRA_HEADERS[c] || '';
+        sh.Range(col(c) + '1').Value2 = EXTRA_HEADERS[c];
         added++;
       }
     } catch (e) { }
@@ -260,7 +260,7 @@ function writeMain(o, imgInfo, calc) {
   }
   clearImages(sh, r);
 
-  /* 43 个原字段 + AR~BE 图片扩展列 + BF 图片清单 = 58 列 */
+  /* 43 个原字段（审计列留空）+ AR~AY 图片扩展列 + BF 图片清单 = 58 列 */
   var row = [];
   for (var i = 0; i < 58; i++) row.push('');
 
@@ -303,11 +303,7 @@ function writeMain(o, imgInfo, calc) {
   row[35] = s(o.closeDate);
   row[36] = s(o.closeNote);
   /* row[37] 销单截图图片列 */
-  row[38] = s(o.auditIssueNo);
-  row[39] = s(o.auditResolved);
-  row[40] = s(o.auditRisk);
-  row[41] = s(o.auditFixed);
-  /* row[42] 审计佐证截图图片列 */
+  /* 原表第 39～43 列为历史审计列，本版不再写入，保留留空以兼容既有在线表 */
   row[57] = imgInfo.names;
 
   /* 单号/月份强制文本，避免 2026-11 被转成日期序列号 */
@@ -401,7 +397,6 @@ function listAll() {
           discountRate: num(r[27], 0), repriceDate: s(r[28]), grossDamage: num(r[29], 0),
           soldQty: num(r[31], 0), soldAmount: num(r[32], 0), saleEndDate: s(r[33]),
           closeDate: s(r[35]), closeNote: s(r[36]),
-          auditIssueNo: s(r[38]), auditResolved: s(r[39]), auditRisk: s(r[40]), auditFixed: s(r[41]),
           imageList: s(r[57])
         });
       }
