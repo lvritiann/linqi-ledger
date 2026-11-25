@@ -14,7 +14,7 @@
 
   global.LQ_CFG = {
     report: {
-      url: '',      // 例：https://1320695126-xxxxxxxx.ap-guangzhou.tencentscf.com
+      url: 'https://1320695126-l6lngmmgot.ap-guangzhou.tencentscf.com', // 腾讯云函数 URL
       token: ''     // 保持留空
     },
     kdocs: {

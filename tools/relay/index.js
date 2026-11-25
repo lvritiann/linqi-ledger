@@ -153,6 +153,23 @@ function tryJson(text) {
   try { return JSON.parse(text); } catch (e) { return null; }
 }
 
+/**
+ * 把前端发来的裸业务 JSON 包成金山 AirScript webhook 认的形状：
+ *   { "Context": { "argv": { ...业务参数... } } }
+ * 金山运行时只会把请求体里 Context.argv 这一层填进脚本的 Context.argv；
+ * 直接 POST 裸 body 时脚本读到的是空 argv，readArgv() 会把 action 兜底成
+ * 'submit' 再报「缺 id」——这正是本次 P0 的现象。
+ * 已经包好的 body 原样透传（幂等），避免将来前端改了包法后被重复包一层。
+ */
+function toAirScriptBody(raw) {
+  var biz = tryJson(raw);
+  if (biz && typeof biz === 'object' && !Array.isArray(biz) &&
+      biz.Context && biz.Context.argv && typeof biz.Context.argv === 'object') {
+    return raw;
+  }
+  return JSON.stringify({ Context: { argv: (biz && typeof biz === 'object') ? biz : {} } });
+}
+
 /** 从响应的三种可能形状里取 task_id */
 function pickTaskId(obj) {
   if (!obj) return '';
@@ -285,13 +302,19 @@ exports.main_handler = async (event, context) => {
   }
   if (!body) body = '{}';
 
+  /* ★ P0 修复：前端发的是裸业务 JSON（如 {"action":"list"}），
+     金山 AirScript 只认 body 顶层的 Context.argv，必须在这里补上包装层。
+     考核系统的 scf.js 之所以原样转发即可，是因为它前端 score.js:855
+     在提交时就已经把参数包成了 {Context:{argv:{payload:{...}}}}。 */
+  const airscriptBody = toAirScriptBody(body);
+
   /* 函数 URL 的同步请求体有上限，超了在平台层就被拒，这里再兜一次免得徒劳转发 */
-  const size = Buffer.byteLength(body, 'utf8');
+  const size = Buffer.byteLength(airscriptBody, 'utf8');
   if (size > 10 * 1024 * 1024) {
     return reply(413, { ok: false, error: '请求体 ' + (size / 1048576).toFixed(1) + 'MB，超出上限' }, origin);
   }
 
-  const buf = Buffer.from(body, 'utf8');
+  const buf = Buffer.from(airscriptBody, 'utf8');
 
   /* ---------- ① 先试异步提交 ---------- */
   let taskId = '';
@@ -350,3 +373,6 @@ exports.main_handler = async (event, context) => {
   console.log('异步完成', taskId, cost, 'ms');
   return { statusCode: 200, headers: corsHeaders(origin), body: JSON.stringify(done), isBase64Encoded: false };
 };
+
+/* 仅供本地自测断言包装结果用，线上调用不受影响 */
+exports._toAirScriptBody = toAirScriptBody;

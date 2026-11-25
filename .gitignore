@@ -1,2 +1,4 @@
 .workbuddy/
 *.log
+# 含账号级令牌，仅供本地照做，禁止推送上线
+TENCENT_CLOUD_SETUP.md
