@@ -40,14 +40,15 @@ python3 -m http.server 8765 --bind 127.0.0.1
 
 浏览器打开 `http://127.0.0.1:8765/index.html`
 
-## 四、GitHub Pages 托管
+## 四、在线地址（已部署）
 
-1. 在 GitHub 新建仓库（建议私有），如 `linqi-ledger`
-2. 把本目录所有文件上传到仓库根目录
-3. 仓库 → Settings → Pages → Source 选 `main` / `root` → Save
-4. 几分钟后得到 `https://<用户名>.github.io/linqi-ledger/`
+- **网页工具**：https://lvritiann.github.io/linqi-ledger/
+- **GitHub 仓库**：https://github.com/lvritiann/linqi-ledger
+- **WPS 空白台账模板**：https://www.kdocs.cn/l/cdQWmOad2K3x
 
-注意：GitHub Pages 只托管页面，**数据保存在各自电脑浏览器本地**，不会上云、不会跨电脑同步。
+推荐用法：电脑浏览器打开网页工具填报 → 导出 Excel → 把数据贴进 WPS 台账模板汇总。
+
+注意：GitHub Pages 只托管页面，**数据保存在各自电脑浏览器本地**，不会上云、不会跨电脑同步。务必定期点「备份 JSON」。
 
 ## 五、数据备份与迁移（重要）
 
