@@ -120,10 +120,14 @@ h1{
   padding:0 .45rem;font-family:var(--font-num);font-size:.7rem;margin-left:.25rem;
 }
 
-main{padding:clamp(18px,3vw,32px) clamp(16px,3vw,32px) 4rem;max-width:1440px;margin:0 auto}
+/* 全屏铺满（与驾驶舱 .shell 一致）；打印媒体内另有 padding:0 规则，不受影响 */
+main{padding:clamp(18px,3vw,32px) clamp(16px,3vw,32px) 4rem;max-width:none;margin:0}
 .panel{display:none}
 .panel.active{display:block;animation:panel-in .32s var(--ease-out) both}
 @keyframes panel-in{from{opacity:0;transform:translateY(8px) scale(.995)}to{opacity:1;transform:none}}
+/* 业务分段：一次只显示一段，与顶部 panel 同款进场动画 */
+.step-panel{display:none}
+.step-panel.active{display:block;animation:panel-in .32s var(--ease-out) both}
 
 /* ---------------- 通用控件 ---------------- */
 .toolbar{
@@ -176,41 +180,46 @@ main{padding:clamp(18px,3vw,32px) clamp(16px,3vw,32px) 4rem;max-width:1440px;mar
 }
 .save-state.saved{color:var(--down);border-color:rgba(52,211,153,.45);box-shadow:0 0 0 3px rgba(52,211,153,.10)}
 
-/* ---------------- 步骤进度轨 ---------------- */
+/* ---------------- 业务分段 Tab（4 张可切换页面标签） ---------------- */
+/* 外观与顶部 nav.tabs 同款：扁平标签 + 底部高亮条；保留 .step/.active/.done 供 app.js 使用 */
 .stepbar{
-  display:flex;gap:.5rem;margin-bottom:1rem;padding:0;background:transparent;
+  display:flex;gap:0;margin-bottom:1.25rem;
+  background:var(--panel);border-bottom:1px solid var(--line);
 }
 .step{
-  position:relative;flex:1 1 0;display:flex;align-items:center;gap:.55rem;
-  border:1px solid var(--line);border-radius:var(--r);
-  padding:.75rem .9rem;cursor:pointer;
-  font:inherit;font-size:.8125rem;color:var(--mut);
-  background:var(--panel);text-align:left;
-  transition:background .18s var(--ease-out),color .18s var(--ease-out),
-             border-color .18s var(--ease-out),box-shadow .18s var(--ease-out);
+  flex:1 1 0;min-width:0;
+  display:flex;align-items:center;justify-content:center;gap:.5rem;
+  border:0;border-bottom:2px solid transparent;background:transparent;
+  padding:.85rem 1rem;cursor:pointer;
+  font:inherit;font-size:.875rem;color:var(--mut);
+  transition:color .18s var(--ease-out),border-color .18s var(--ease-out),background .18s var(--ease-out);
 }
-.step:not(:last-child)::after{
-  content:"";position:absolute;right:calc(.5rem * -1);top:50%;
-  width:.5rem;height:1px;background:var(--line-strong);
-}
-.step:hover{background:var(--panel2);color:var(--txt);border-color:var(--line-strong)}
-.step.active{
-  background:linear-gradient(135deg,rgba(56,189,248,.14),rgba(94,234,212,.07));
-  color:var(--data);font-weight:700;border-color:rgba(56,189,248,.45);
-  box-shadow:var(--shadow-glow);
-}
+.step:hover{color:var(--txt);background:rgba(56,189,248,.05)}
+.step.active{color:var(--data);border-bottom-color:var(--hero);font-weight:700}
 .step b{
-  width:1.6rem;height:1.6rem;flex:0 0 1.6rem;
   display:inline-flex;align-items:center;justify-content:center;
-  border:1px solid var(--line-strong);border-radius:50%;
+  min-width:1.25rem;height:1.25rem;padding:0 .3rem;flex:0 0 auto;
+  border:1px solid var(--line-strong);border-radius:var(--radius-sm);
   background:var(--panel2);color:var(--mut);
-  font-family:var(--font-num);font-size:.75rem;font-weight:700;
+  font-family:var(--font-num);font-size:.7rem;font-weight:700;
 }
-.step.active b{
-  background:var(--data);border-color:transparent;color:#04121B;
-  box-shadow:0 0 0 4px rgba(56,189,248,.14),0 0 12px rgba(56,189,248,.35);
+.step.active b{background:var(--data);border-color:var(--data);color:#04121B}
+/* .done 不再呈现绿色完成态：JS 仍会加 class，视觉与未访问一致 */
+.step.done,.step.done b{color:var(--mut)}
+.step.done b{background:var(--panel2);border-color:var(--line-strong)}
+
+/* 当前段说明：仅屏幕显示，打印时隐藏（不改动打印媒体查询） */
+.step-intro{display:none}
+@media screen{
+  .step-intro{
+    display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;
+    margin:0 0 1rem;padding:.5rem .85rem;
+    font-size:.8125rem;color:var(--mut);
+    background:rgba(56,189,248,.05);border-left:2px solid var(--data);
+    border-radius:0 var(--radius-sm) var(--radius-sm) 0;
+  }
+  .step-intro b{font-family:var(--font-num);color:var(--data);font-weight:700}
 }
-.step.done b{background:var(--down);border-color:transparent;color:#04121B}
 
 /* ---------------- 卡片 / 表单 ---------------- */
 .card{
@@ -242,8 +251,8 @@ main{padding:clamp(18px,3vw,32px) clamp(16px,3vw,32px) 4rem;max-width:1440px;mar
 .hint-line{margin:-.25rem 0 .65rem}
 
 .grid{display:grid;gap:clamp(12px,1.4vw,18px)}
-.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
-.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+/* 全屏宽下按最小宽度自然铺列，字段不被无限拉伸 */
+.g2,.g3{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
 .field{display:flex;flex-direction:column;gap:.35rem;min-width:0}
 .field.full{margin-top:.75rem}
 .field>span{font-size:.75rem;font-weight:700;letter-spacing:.05em;color:var(--mut)}
@@ -307,7 +316,7 @@ main{padding:clamp(18px,3vw,32px) clamp(16px,3vw,32px) 4rem;max-width:1440px;mar
     rgba(56,189,248,.06);
   box-shadow:var(--shadow-glow);
 }
-.thumb-row{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.75rem}
+.thumb-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(7rem,7rem));gap:.6rem;margin-top:.75rem}
 .thumb{
   position:relative;width:7rem;height:5.25rem;
   border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden;background:var(--panel2);
@@ -445,7 +454,6 @@ table.ledger tr:hover td{background:rgba(56,189,248,.05)}
   .g3,.g2{grid-template-columns:1fr}
   .stepbar{flex-wrap:wrap}
   .step{flex:1 1 45%}
-  .step:nth-child(2n)::after{display:none}
   h1{font-size:18px}
 }
 @media(max-width:640px){
@@ -458,7 +466,6 @@ table.ledger tr:hover td{background:rgba(56,189,248,.05)}
   .summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .calc-strip>div{min-width:100%}
   .step{flex:1 1 100%}
-  .step::after{display:none!important}
 }
 
 /* ---------------- 打印：退回高对比白底 ---------------- */
