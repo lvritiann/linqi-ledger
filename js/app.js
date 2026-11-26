@@ -99,20 +99,21 @@
       bindCats();
       global.LQImages.init();
 
-      /* 只从云端读单号用于避免重号；读不到也不影响填报 */
-      try {
-        const data = await Cloud.list();
+      /* 先渲染空白单据与分类行：DOM ready 即可见三级联动，不等待云函数。
+         云端读取只服务于记录页与单号去重，放到后台完成；不可达时静默，填报不受影响。 */
+      await App.newOrder();
+      renderRecords();
+
+      Cloud.list().then(data => {
         if (data && data.ok !== false) {
           STATE.records = data.records || [];
           STATE.logs = data.logs || [];
           STATE.allIds = STATE.records.map(o => o.id);
         }
-      } catch (e) {
-        /* 云函数未配置时静默：页面仍可填，提交时会给出明确提示 */
-      }
-
-      await App.newOrder();
-      renderRecords();
+        renderRecords();
+      }).catch(() => {
+        /* 云函数未配置或不可达时静默：提交时会给出明确提示 */
+      });
     },
 
     blankOrder() {
