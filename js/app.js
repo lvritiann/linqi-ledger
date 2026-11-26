@@ -19,6 +19,61 @@
   };
   const GROUP_KEYS = ['detailImages', 'applyImages', 'approveImages', 'repriceImages', 'saleImages', 'closeImages'];
 
+  /* ---------- 枚举清单（js/catalog.js，来自非油驾驶舱，权威去重） ---------- */
+  /* catalog.js 未加载时降级为空对象，避免整页脚本崩溃；填报页另给明确提示 */
+  function catalog() {
+    return global.LQ_CATALOG || { stations: [], stationShorts: {}, bigs: [], tree: {} };
+  }
+
+  /* 油站选项：withFull=true 显示「简称（全称）」，false 只显示简称；value 一律为全称 */
+  function stationOptions(withFull) {
+    const cat = catalog();
+    const shorts = cat.stationShorts || {};
+    return (cat.stations || []).map(s => {
+      const short = shorts[s] || s;
+      const label = withFull ? short + '（' + s + '）' : short;
+      return `<option value="${U.escapeHtml(s)}" title="${U.escapeHtml(s)}">${U.escapeHtml(label)}</option>`;
+    }).join('');
+  }
+
+  /* 填报表单与提交记录筛选共用同一份清单，避免两处选项漂移 */
+  function fillStationSelects() {
+    const cat = catalog();
+    if (!cat.stations || !cat.stations.length) {
+      U.toast('油站清单未加载，请检查 js/catalog.js', true);
+      return;
+    }
+    const formSel = $('select[name="station"]');
+    if (formSel) formSel.insertAdjacentHTML('beforeend', stationOptions(true));
+    const filterSel = $('#filterRecordStation');
+    if (filterSel) filterSel.insertAdjacentHTML('beforeend', stationOptions(false));
+  }
+
+  /* 单个 option；selected 时补属性，值一律转义 */
+  function catOption(value, text, selected) {
+    return `<option value="${U.escapeHtml(value)}"${selected ? ' selected' : ''}>${U.escapeHtml(text)}</option>`;
+  }
+
+  /* 中类选项：首项留空表示「只按大类填」；大类为空或自定义时不列中类 */
+  function midOptions(big, current) {
+    const tree = catalog().tree || {};
+    const mids = (big && big !== '__custom__' && tree[big]) || [];
+    return catOption('', '仅大类（可留空）', !current) + mids.map(m => catOption(m, m, m === current)).join('');
+  }
+
+  /* 由存量 c.name 反推两级位置：命中大类→只选大类；命中中类→两级；都不命中→自定义 */
+  function resolveCat(name) {
+    const cat = catalog();
+    const n = String(name == null ? '' : name).trim();
+    if (!n) return { big: '', mid: '', custom: '' };
+    if ((cat.bigs || []).indexOf(n) >= 0) return { big: n, mid: '', custom: '' };
+    const tree = cat.tree || {};
+    for (const b of (cat.bigs || [])) {
+      if ((tree[b] || []).indexOf(n) >= 0) return { big: b, mid: n, custom: '' };
+    }
+    return { big: '__custom__', mid: '', custom: n };
+  }
+
   function newOrder() { return App.newOrder(); }
   function loadPlaceholder(id) { return App.loadPlaceholder(id); }
 
@@ -39,6 +94,7 @@
     },
 
     async init() {
+      fillStationSelects();
       bindUI();
       bindCats();
       global.LQImages.init();
@@ -200,16 +256,31 @@
     recalc();
   }
 
+  /* 分类行：第 1 列改为「大类 + 中类 + 自定义」；整行状态都由 STATE.cats[i].name 反推，
+     因此 renderCats() 重建后仍能正确还原，loadOrder 之类的回填路径只要写入 cats 即可 */
   function renderCats() {
     const body = $('#catBody');
     if (!body) return;
-    body.innerHTML = STATE.cats.map((c, i) =>
-      `<tr data-ci="${i}">
-        <td><input type="text" value="${U.escapeHtml(c.name)}" data-cf="name" data-ci="${i}" placeholder="如：饮料 / 方便面 / 汽车用品"></td>
-        <td><input type="number" min="0" step="1" value="${U.escapeHtml(c.qty)}" data-cf="qty" data-ci="${i}" placeholder="0"></td>
-        <td><input type="number" min="0" step="0.01" value="${U.escapeHtml(c.amount)}" data-cf="amount" data-ci="${i}" placeholder="0.00"></td>
+    const bigs = catalog().bigs || [];
+    body.innerHTML = STATE.cats.map((c, i) => {
+      const r = resolveCat(c.name);
+      const isCustom = r.big === '__custom__';
+      const bigOpts = catOption('', '选择大类', !r.big) +
+        bigs.map(b => catOption(b, b, b === r.big)).join('') +
+        catOption('__custom__', '自定义…', isCustom);
+      return `<tr data-ci="${i}">
+        <td>
+          <div class="cat-pick">
+            <select class="cat-big" data-ci="${i}" data-role="big" aria-label="分类大类">${bigOpts}</select>
+            <select class="cat-mid" data-ci="${i}" data-role="mid" aria-label="分类中类"${isCustom || !r.big ? ' disabled' : ''}>${midOptions(r.big, r.mid)}</select>
+            <input type="text" class="cat-custom" data-ci="${i}" data-role="custom" value="${U.escapeHtml(r.custom)}" placeholder="输入清单外品类"${isCustom ? '' : ' style="display:none"'}>
+          </div>
+        </td>
+        <td><input type="number" min="0" step="1" value="${U.escapeHtml(c.qty)}" data-cf="qty" data-role="qty" data-ci="${i}" placeholder="0"></td>
+        <td><input type="number" min="0" step="0.01" value="${U.escapeHtml(c.amount)}" data-cf="amount" data-role="amount" data-ci="${i}" placeholder="0.00"></td>
         <td><button type="button" class="cat-del" data-ci="${i}" title="删除此行">×</button></td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
     updateCatTotal();
   }
 
@@ -222,15 +293,64 @@
 
   function bindCats() {
     const body = $('#catBody');
-    body.addEventListener('input', e => {
+
+    /* 两级下拉用事件委托：renderCats() 重建行后无需重新绑定，联动持续生效 */
+    body.addEventListener('change', e => {
       const el = e.target;
-      if (!el.dataset || el.dataset.cf === undefined) return;
+      if (!el.dataset || !el.dataset.role) return;
+      const role = el.dataset.role;
+      if (role !== 'big' && role !== 'mid') return;
       const i = parseInt(el.dataset.ci, 10);
       if (!STATE.cats[i]) return;
-      STATE.cats[i][el.dataset.cf] = el.value;
+      const row = el.closest('tr');
+      if (!row) return;
+      const midSel = row.querySelector('.cat-mid');
+      const custom = row.querySelector('.cat-custom');
+
+      if (role === 'big') {
+        const big = el.value;
+        if (big === '__custom__') {
+          midSel.innerHTML = midOptions('', '');
+          midSel.disabled = true;
+          custom.style.display = '';
+          custom.value = '';
+          custom.focus();
+          STATE.cats[i].name = '';
+        } else if (!big) {
+          midSel.innerHTML = midOptions('', '');
+          midSel.disabled = true;
+          custom.style.display = 'none';
+          custom.value = '';
+          STATE.cats[i].name = '';
+        } else {
+          midSel.innerHTML = midOptions(big, '');
+          midSel.disabled = false;
+          custom.style.display = 'none';
+          custom.value = '';
+          /* 只选大类时 name 存大类名，保持数据结构仍是 {name,qty,amount} */
+          STATE.cats[i].name = big;
+        }
+      } else {
+        const big = row.querySelector('.cat-big').value;
+        STATE.cats[i].name = el.value || big || '';
+      }
       STATE.dirty = true; markDirty();
       updateCatTotal(); recalc();
     });
+
+    /* 自定义品类与数量、金额仍走 input 事件，dirty / 合计 / 重算链路不变 */
+    body.addEventListener('input', e => {
+      const el = e.target;
+      if (!el.dataset || !el.dataset.role) return;
+      const role = el.dataset.role;
+      if (role !== 'qty' && role !== 'amount' && role !== 'custom') return;
+      const i = parseInt(el.dataset.ci, 10);
+      if (!STATE.cats[i]) return;
+      STATE.cats[i][role === 'custom' ? 'name' : role] = el.value;
+      STATE.dirty = true; markDirty();
+      updateCatTotal(); recalc();
+    });
+
     body.addEventListener('click', e => {
       const btn = e.target.closest('.cat-del');
       if (!btn) return;
@@ -240,13 +360,15 @@
       STATE.dirty = true; markDirty();
       renderCats(); recalc();
     });
+
     $('#btnAddCat').addEventListener('click', () => {
       STATE.cats.push({ name: '', qty: '', amount: '' });
       STATE.dirty = true; markDirty();
       renderCats();
       const rows = $$('#catBody tr');
       const last = rows[rows.length - 1];
-      if (last) last.querySelector('input').focus();
+      const firstSel = last && last.querySelector('.cat-big');
+      if (firstSel) firstSel.focus();
     });
   }
 
@@ -408,7 +530,7 @@
     });
 
     $('#btnRefreshRecords').addEventListener('click', () => refreshRecords());
-    $('#filterRecordStation').addEventListener('input', renderRecords);
+    $('#filterRecordStation').addEventListener('change', renderRecords);
     $('#filterRecordMonth').addEventListener('change', renderRecords);
 
     window.addEventListener('beforeunload', e => {

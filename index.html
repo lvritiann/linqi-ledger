@@ -57,7 +57,7 @@
     <div class="card">
       <h2>基础信息</h2>
       <div class="grid g3">
-        <label class="field"><span>油站 <i>*</i></span><input type="text" name="station" placeholder="如：秦岭" required></label>
+        <label class="field"><span>油站 <i>*</i></span><select name="station" required><option value="">请选择油站</option></select></label>
         <label class="field"><span>统计月份 <i>*</i></span><input type="month" name="month" required></label>
         <label class="field"><span>填报人</span><input type="text" name="handler" placeholder="姓名或岗位"></label>
       </div>
@@ -212,7 +212,7 @@
 <section id="panel-records" class="panel">
   <div class="toolbar">
     <div class="toolbar-left">
-      <label class="field-inline"><span>油站</span><input type="text" id="filterRecordStation" placeholder="全部" style="width:130px"></label>
+      <label class="field-inline"><span>油站</span><select id="filterRecordStation" style="width:150px"><option value="">全部</option></select></label>
       <label class="field-inline"><span>月份</span><input type="month" id="filterRecordMonth" style="width:150px"></label>
     </div>
     <div class="toolbar-right"><button type="button" class="btn btn-ghost" id="btnRefreshRecords">刷新在线记录</button></div>
@@ -307,6 +307,7 @@ window.addEventListener('unhandledrejection', function(e){
 <script src="js/utils.js"></script>
 <script src="js/images.js"></script>
 <script src="js/cloud.js"></script>
+<script src="js/catalog.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
