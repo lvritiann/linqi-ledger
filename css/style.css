@@ -151,6 +151,7 @@ main{padding:clamp(18px,3vw,32px) clamp(16px,3vw,32px) 4rem;max-width:none;margi
   border-radius:var(--radius-sm);
   padding:.55rem .95rem;
   font:inherit;font-size:.875rem;font-weight:650;letter-spacing:.01em;
+  display:inline-flex;align-items:center;justify-content:center;text-decoration:none;
   cursor:pointer;min-height:38px;
   transition:transform .18s var(--ease-out),background .18s var(--ease-out),
              border-color .18s var(--ease-out),box-shadow .18s var(--ease-out);
@@ -435,6 +436,54 @@ table.ledger tr:hover td{background:rgba(56,189,248,.05)}
 }
 .print-head{display:none}
 
+/* ---------------- 打印预览覆盖层（公司端：屏幕深色，纸张白底即打印效果） ---------------- */
+.print-preview{
+  position:fixed;inset:0;z-index:90;
+  display:flex;flex-direction:column;
+  background:rgba(0,0,0,.7);
+}
+.print-preview[hidden]{display:none!important}
+.print-preview-bar{
+  flex:0 0 auto;
+  display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  padding:12px clamp(16px,3vw,32px);
+  background:var(--panel);border-bottom:1px solid var(--line);
+}
+.print-preview-heading{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;min-width:0}
+.print-preview-heading strong{color:var(--txt);font-size:1rem;flex-shrink:0}
+.print-preview-heading span{color:var(--mut);font-size:.8125rem;overflow-wrap:anywhere}
+.print-preview-btns{display:flex;gap:.75rem;flex-shrink:0}
+.print-preview-body{
+  flex:1 1 auto;min-height:0;overflow:auto;
+  padding:24px clamp(16px,3vw,32px) 48px;
+}
+.print-paper{
+  width:794px;max-width:100%;min-height:1123px;
+  margin:0 auto;padding:48px 56px;
+  background:#fff;color:#000;
+  border-radius:2px;box-shadow:0 20px 60px rgba(0,0,0,.55);
+  font:12px/1.6 "Microsoft YaHei","PingFang SC",sans-serif;
+}
+.print-paper .print-head{
+  display:block;margin:0 0 .75rem;padding-bottom:.4rem;
+  border-bottom:2px solid #000;color:#000;font-size:.9rem;
+}
+.print-paper h3{
+  margin:1.2rem 0 .5rem;padding-bottom:.25rem;
+  border-bottom:1px solid #000;color:#000;font-size:.95rem;
+}
+.print-paper table{width:100%;border-collapse:collapse;background:#fff;color:#000}
+.print-paper table th,.print-paper table td{
+  border:1px solid #999;padding:.28rem .4rem;
+  background:#fff!important;color:#000!important;
+  font-size:.68rem;overflow-wrap:anywhere;
+}
+.print-paper table th{font-weight:700}
+.print-paper small,.print-paper b,.print-paper .mono{color:#000!important}
+.print-paper .tag,.print-paper .tag.done,.print-paper .tag.warn{
+  background:#fff!important;border-color:#000!important;color:#000!important;
+}
+
 /* ---------------- 反馈 / 遮罩 ---------------- */
 .toast{
   position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100px);
@@ -492,6 +541,44 @@ table.ledger tr:hover td{background:rgba(56,189,248,.05)}
   .tag{background:#fff!important;border-color:#000!important;color:#000!important}
   .print-head{display:block;margin-bottom:.75rem;font-size:.9rem;border-bottom:2px solid #000;padding-bottom:.4rem;color:#000}
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+
+/* 公司端打印：只输出预览纸张，隐藏 #adminMain 里的同款表格，杜绝重复打印。
+   上面的通用打印规则保持原样（填报端不受影响），这里只针对 .admin-page。 */
+@media print{
+  .admin-page .top,
+  .admin-page .admin-gate,
+  .admin-page #adminMain,
+  .admin-page #toast,
+  .admin-page .lightbox{display:none!important}
+
+  .admin-page #printPreview{
+    position:static!important;
+    display:block!important;
+    inset:auto!important;
+    width:auto!important;height:auto!important;
+    max-height:none!important;
+    margin:0!important;padding:0!important;
+    overflow:visible!important;
+    background:#fff!important;
+    box-shadow:none!important;
+  }
+  .admin-page .print-preview-bar{display:none!important}
+  .admin-page .print-preview-body{
+    display:block!important;
+    overflow:visible!important;
+    max-height:none!important;
+    margin:0!important;padding:0!important;
+    background:#fff!important;
+  }
+  .admin-page .print-paper{
+    width:auto!important;max-width:none!important;min-height:0!important;
+    margin:0!important;padding:0!important;
+    border:0!important;box-shadow:none!important;
+    background:#fff!important;color:#000!important;
+  }
+  .admin-page .print-paper table th,
+  .admin-page .print-paper table td{border:1px solid #999!important;padding:.28rem .4rem!important}
 }
 
 /* ---------------- 无障碍：减少动效 ---------------- */

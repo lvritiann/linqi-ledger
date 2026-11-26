@@ -6,7 +6,7 @@
 <title>临期商品一单一销台账 · 公司导出端</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
+<body class="admin-page">
 <header class="top">
   <div class="brand">
     <div class="logos">
@@ -21,7 +21,7 @@
     </div>
   </div>
   <div class="topright">
-    <button type="button" class="btn btn-ghost" id="btnAdminOpenKdocs">打开在线台账</button>
+    <a href="index.html" class="btn btn-ghost" id="btnGoForm">返回填报端</a>
   </div>
 </header>
 
@@ -45,7 +45,8 @@
   <div class="admin-actions">
     <button type="button" class="btn btn-ghost" id="btnAdminRefresh">刷新在线数据</button>
     <button type="button" class="btn btn-primary" id="btnAdminExport">导出 Excel（公司打印版）</button>
-    <button type="button" class="btn btn-success" id="btnAdminPrint">直接打印 / 另存 PDF</button>
+    <button type="button" class="btn btn-primary" id="btnAdminPreview">打印预览</button>
+    <button type="button" class="btn btn-ghost" id="btnAdminPrint">直接打印 / 另存 PDF</button>
   </div>
 
   <div class="toolbar">
@@ -84,6 +85,27 @@
     </div>
   </div>
 </main>
+
+<!-- 打印预览：工具条 + 白底纸张；打印时只输出纸张内容，避免与上方原表格重复 -->
+<div class="print-preview" id="printPreview" role="dialog" aria-modal="true" aria-labelledby="printPreviewTitle" hidden>
+  <div class="print-preview-bar">
+    <div class="print-preview-heading">
+      <strong id="printPreviewTitle">打印预览</strong>
+      <span>以下为打印效果预览，确认无误后点击确认打印</span>
+    </div>
+    <div class="print-preview-btns">
+      <button type="button" class="btn btn-success btn-sm" id="btnConfirmPrint">确认打印</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="btnClosePreview">关闭</button>
+    </div>
+  </div>
+  <div class="print-preview-body" id="printPreviewBody">
+    <div class="print-paper" id="printPaper">
+      <div class="print-head" id="previewHead"></div>
+      <div id="previewRecords"></div>
+      <div id="previewLogs"></div>
+    </div>
+  </div>
+</div>
 
 <div id="toast" class="toast"></div>
 <script>

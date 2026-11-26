@@ -170,6 +170,50 @@
     }
   }
 
+  /* ---------- 打印预览 ----------
+   * 屏幕与打印共用同一份「纸张」内容：打印前统一同步，
+   * @media print 只输出这张纸，因此不会出现两份台账 / 日志。 */
+  function syncPrintPaper() {
+    if (!$('#printPaper')) return;
+    const head = $('#previewHead');
+    if (head) head.textContent = ($('#printHead') && $('#printHead').textContent) || '';
+    const records = $('#previewRecords');
+    if (records) {
+      const table = $('#adminRecordTable');
+      records.innerHTML = '<h3>一单一销台账（在线）</h3>' + (table ? table.outerHTML : '');
+    }
+    const logs = $('#previewLogs');
+    if (logs) {
+      const table = $('#adminLogTable');
+      logs.innerHTML = '<h3>提交日志（全过程留痕）</h3>' + (table ? table.outerHTML : '');
+    }
+  }
+
+  function openPreview() {
+    if (!STATE.ready) { U.toast('请先进入公司端并读取在线数据', true); return; }
+    render();
+    syncPrintPaper();
+    const box = $('#printPreview');
+    if (box) {
+      box.hidden = false;
+      const body = $('#printPreviewBody');
+      if (body) body.scrollTop = 0;
+    }
+  }
+
+  function closePreview() {
+    const box = $('#printPreview');
+    if (box) box.hidden = true;
+  }
+
+  function doPrint() {
+    if (!STATE.ready) { U.toast('请先进入公司端并读取在线数据', true); return; }
+    render();
+    syncPrintPaper();
+    closePreview();
+    window.print();
+  }
+
   function login() {
     const code = ($('#adminCode').value || '').trim();
     const want = String(CFG.companyCode || '888888');
@@ -184,12 +228,15 @@
     $('#adminCode').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
     $('#btnAdminRefresh').addEventListener('click', () => load());
     $('#btnAdminExport').addEventListener('click', exportExcel);
-    $('#btnAdminPrint').addEventListener('click', () => { render(); window.print(); });
+    $('#btnAdminPreview').addEventListener('click', openPreview);
+    $('#btnConfirmPrint').addEventListener('click', doPrint);
+    $('#btnClosePreview').addEventListener('click', closePreview);
+    $('#btnAdminPrint').addEventListener('click', doPrint);
     $('#adminFilterStation').addEventListener('input', render);
     $('#adminFilterMonth').addEventListener('change', render);
-    $('#btnAdminOpenKdocs').addEventListener('click', () => {
-      const url = (CFG.kdocs && CFG.kdocs.url) || '';
-      if (url) window.open(url, '_blank');
+    document.addEventListener('keydown', e => {
+      const box = $('#printPreview');
+      if (e.key === 'Escape' && box && !box.hidden) closePreview();
     });
   }
 
